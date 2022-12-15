@@ -1,66 +1,6 @@
 import re
 
 
-class Grid:
-    def __init__(self, pairs):
-        self.pairs = pairs
-        self.sensors = list(map(lambda x: x[0], pairs))
-        self.beacons = list(map(lambda x: x[1], pairs))
-        xs = list(map(lambda x: x[0], self.sensors))
-        xs.extend(list(map(lambda x: x[0], self.beacons)))
-        ys = list(map(lambda x: x[1], self.sensors))
-        ys.extend(list(map(lambda x: x[1], self.beacons)))
-        self.min_x, self.min_y = -8, -10
-        self.max_x, self.max_y = 28, 26
-        self.x_range = list(range(self.min_x, self.max_x + 1))
-        self.y_range = list(range(self.min_y, self.max_y + 1))
-        self.grid = [[0 for _ in self.x_range] for _ in self.y_range]
-
-    def __str__(self):
-        rows = []
-        for y in self.y_range:
-            row = [str(y).ljust(4)]
-            for x in self.x_range:
-                if (x, y) in self.sensors:
-                    row.append('S')
-                elif (x, y) in self.beacons:
-                    row.append('B')
-                elif self.grid[y][x] == 0:
-                    row.append('.')
-                else:
-                    row.append('#')
-            rows.append(''.join(row))
-        return '\n'.join(rows)
-
-    def scan_all(self):
-        for sensor, nearest_beacon in self.pairs:
-            max_distance = manhattan(sensor, nearest_beacon)
-            self.scan_sensor(sensor, max_distance)
-
-    def scan_sensor(self, sensor, max_distance):
-        q = []
-        visited = set()
-        visited.add(sensor)
-        q.insert(0, sensor)
-        levels = dict()
-        levels[sensor] = 0
-        while q:
-            item = q.pop()
-            for neighbor in self._neighbors(*item):
-                if not neighbor in visited:
-                    levels[neighbor] = levels[item] + 1
-                    if levels[neighbor] <= max_distance:
-                        visited.add(neighbor)
-                        q.insert(0, neighbor)
-                        self.grid[neighbor[1]][neighbor[0]] = 1
-
-    def _neighbors(self, x, y):
-        yield (x - 1, y)
-        yield (x + 1, y)
-        yield (x, y - 1)
-        yield (x, y + 1)
-
-
 def parse(filename):
     with open(filename, 'r') as f:
         return map(lambda s: s.rstrip(), f.readlines())
@@ -84,17 +24,45 @@ def manhattan(source, destination):
     return abs(source[0] - destination[0]) + abs(source[1] - destination[1])
 
 
-def simulate(filename):
+def generate_manhattan(x, y, distance, check_row):
+    s = set()
+    for row in range(y - distance, y + distance + 1):
+        if row == check_row:
+            length = distance - abs(row - y)
+            if length == 0:
+                s.add((x, row))
+            else:
+                for column in range(x - length, x + length + 1):
+                    s.add((column, row))
+    return s
+
+
+def simulate(filename, check_row):
     data = list(parse_data(parse(filename)))
-    grid = Grid(data)
-    print(grid)
-    print()
-    grid.scan_all()
-    print(grid)
+    all_sensors = set(map(lambda d: d[0], data))
+    all_beacons = set(map(lambda d: d[1], data))
+    s = set()
+
+    for sensor, beacon in data:
+        print('checking sensor {}'.format(sensor))
+        distance = manhattan(sensor, beacon)
+        sensor_cells = set()
+        for cell in generate_manhattan(sensor[0], sensor[1], distance, check_row):
+            if not cell in all_sensors and not cell in all_beacons:
+                sensor_cells.add(cell)
+                s.add(cell)
+        print('checked sensor {}'.format(sensor))
+        if len(sensor_cells) > 0:
+            print('sensor blocks {} locations from {} to {}'.format(
+                len(sensor_cells), min(sensor_cells), max(sensor_cells)))
+        else:
+            print('sensor blocks no locations')
+
+    return len(s)
 
 
 def solve_part1(filename):
-    result = simulate(filename)
+    result = simulate(filename, 2000000)
     print(result)
 
 
